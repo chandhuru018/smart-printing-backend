@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Cost Estimation | Smart IoT Printing{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-1">
+    <div class="col-12 col-xl-10">
+        <section class="glass-card p-4 p-md-5">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <p class="eyebrow mb-2">AI Cost Display</p>
+                    <h1 class="h2 mb-1">Print Job Configuration</h1>
+                    <p class="text-secondary mb-0">File: <span class="fw-semibold">{{ job.filename }}</span></p>
+                </div>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert {% if category == 'error' %}alert-danger{% else %}alert-success{% endif %} border-0 shadow-sm" role="alert">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-md-3">
+                    <div class="metric-card">
+                        <p class="metric-label">Total Pages</p>
+                        <p class="metric-value">{{ job.page_count or 1 }}</p>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="metric-card">
+                        <p class="metric-label">Color %</p>
+                        <p class="metric-value">
+                            {% if analytics and job.mode == 'color' %}
+                                {{ "%.2f"|format(analytics.overall_color_density * 100) }}%
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="metric-card">
+                        <p class="metric-label">Queue ETA</p>
+                        <p class="metric-value">{{ job.estimated_wait_minutes }} min</p>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="metric-card">
+                        <p class="metric-label">Recommendation</p>
+                        <p class="metric-value">
+                            {% if analytics and job.mode == 'color' %}
+                                {{ pricing.recommendation }}
+                            {% else %}
+                                Black & White
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <form id="optionsForm" action="{{ url_for('main.options') }}" method="post" class="row g-3">
+                {% set total_pages = job.page_count or (analytics.page_count if analytics else 1) %}
+                <div class="col-md-6">
+                    <label for="copies" class="form-label fw-semibold">Copies</label>
+                    <input id="copies" type="number" name="copies" min="1" value="{{ job.copies or 1 }}" class="form-control form-control-lg" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="mode" class="form-label fw-semibold">Mode</label>
+                    <select id="mode" name="mode" class="form-select form-select-lg">
+                        <option value="bw" {% if job.mode == 'bw' %}selected{% endif %}>Black and White</option>
+                        <option value="color" {% if job.mode == 'color' %}selected{% endif %}>Color</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label for="pageModeSelect" class="form-label fw-semibold">Pages to Print</label>
+                    <div class="row g-2">
+                        <div class="col-12 col-md-4">
+                            <select id="pageModeSelect" class="form-select form-select-lg">
+                                <option value="all">All Pages</option>
+                                <option value="range">Range</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <select id="pageStart" class="form-select form-select-lg">
+                                {% for p in range(1, total_pages + 1) %}
+                                    <option value="{{ p }}">{{ p }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-4">
+                            <select id="pageEnd" class="form-select form-select-lg">
+                                {% for p in range(1, total_pages + 1) %}
+                                    <option value="{{ p }}">{{ p }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <small class="text-secondary">Range is limited to total pages (1 to {{ total_pages }}).</small>
+                    <input id="pageRanges" type="hidden" name="page_ranges" value="{{ job.page_ranges or 'all' }}">
+                </div>
+
+                <input type="hidden" id="hPageCount" value="{{ job.page_count or 1 }}">
+                <input type="hidden" id="hSelectedPageCount" value="{{ job.selected_page_count or (job.page_count or 1) }}">
+                <input type="hidden" id="hBwPages" value="{{ analytics.bw_pages if analytics else (job.page_count or 1) }}">
+                <input type="hidden" id="hColorPages" value="{{ analytics.color_pages if analytics else 0 }}">
+                <input type="hidden" id="hColorDensity" value="{{ analytics.overall_color_density if analytics else 0 }}">
+                <input type="hidden" id="hHasAnalytics" value="{{ 1 if analytics else 0 }}">
+                <input type="hidden" id="hAnalyzeColorUrl" value="{{ url_for('main.analyze_color') }}">
+
+                <div class="col-12">
+                    <div class="breakdown" id="costBreakdown">
+                        <p><strong>BW Pages Cost:</strong> Rs <span id="bwCost">{{ "%.2f"|format(pricing.bw_cost) }}</span></p>
+                        <p><strong>Color Pages Cost:</strong> Rs <span id="colorCost">{{ "%.2f"|format(pricing.color_cost) }}</span></p>
+                        <p><strong>Density Multiplier:</strong> <span id="densityMultiplier">{{ "%.2f"|format(pricing.density_multiplier) }}</span></p>
+                        <p class="total mb-0"><strong>Total Cost:</strong> Rs <span id="totalCost">{{ "%.2f"|format(pricing.total_cost) }}</span></p>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <button id="toPaymentButton" type="submit" class="btn btn-brand btn-lg w-100">Continue to Payment</button>
+                </div>
+            </form>
+        </section>
+    </div>
+</div>
+{% endblock %}

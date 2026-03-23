@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Document | Smart IoT Printing{% endblock %}
+
+{% block content %}
+<div class="row g-4 align-items-stretch mt-1">
+    <div class="col-lg-8">
+        <section class="glass-card p-4 p-md-5 h-100">
+            <p class="eyebrow mb-2">Document Upload</p>
+            <h1 class="display-title mb-3">Fast, Smart, Automated Printing</h1>
+            <p class="text-secondary mb-4">Upload your PDF, DOCX, or image first. AI analysis runs only after you choose Color mode in the next step.</p>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="mb-3">
+                        {% for category, message in messages %}
+                            <div class="alert {% if category == 'error' %}alert-danger{% else %}alert-success{% endif %} border-0 shadow-sm" role="alert">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form id="uploadForm" action="{{ url_for('main.upload') }}" method="post" enctype="multipart/form-data" class="vstack gap-3">
+                <div>
+                    <label for="file" class="form-label fw-semibold">Choose document</label>
+                    <input type="file" id="file" name="file" accept=".pdf,.docx,.jpg,.jpeg,.png" class="form-control form-control-lg" required>
+                    <div class="form-text">Allowed: PDF, DOCX, JPG, JPEG, PNG. Max file size: 20 MB.</div>
+                </div>
+                <button id="uploadButton" type="submit" class="btn btn-lg btn-brand w-100">Upload and Continue</button>
+            </form>
+
+            <div id="uploadLoading" class="loading hidden mt-3">
+                <div class="spinner"></div>
+                <span>Uploading document...</span>
+            </div>
+        </section>
+    </div>
+
+    <div class="col-lg-4">
+        <section class="glass-card p-4 h-100">
+            <h2 class="h4 mb-3">How It Works</h2>
+            <ul class="flow-list ps-3 mb-0">
+                <li>Upload file into MongoDB GridFS</li>
+                <li>Set pages, copies, and mode</li>
+                <li>Run AI analysis only for Color mode</li>
+                <li>Complete UPI payment flow</li>
+                <li>Trigger print queue automatically</li>
+            </ul>
+        </section>
+    </div>
+</div>
+{% endblock %}

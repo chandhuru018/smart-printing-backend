@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: smart-iot-printing
+    runtime: python
+    rootDir: document-printing-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    autoDeploy: true
+    envVars:
+      - key: FLASK_SECRET_KEY
+        sync: false
+      - key: MONGO_URI
+        sync: false
+      - key: MONGO_DB_NAME
+        value: printer
+      - key: USE_MOCK_DB_ON_FAILURE
+        value: "false"
+      - key: MAX_UPLOAD_MB
+        value: "20"
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: SIMULATE_PRINT
+        value: "true"
+      - key: PRINT_VIA_AGENT
+        value: "true"

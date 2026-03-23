@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard | Smart IoT Printing{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 mt-1">
+    <div>
+        <p class="eyebrow mb-1">Control Center</p>
+        <h1 class="h2 mb-0">Admin Dashboard</h1>
+    </div>
+    <form action="{{ url_for('admin.clear_data') }}" method="post" onsubmit="return confirm('Clear all uploaded files and MongoDB job data? This cannot be undone.');">
+        <button type="submit" class="btn btn-danger">Clear Uploaded Data</button>
+    </form>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert {% if category == 'error' %}alert-danger{% else %}alert-success{% endif %} border-0 shadow-sm" role="alert">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-xl-2"><div class="metric-card"><p class="metric-label">Total Jobs</p><p class="metric-value">{{ total_jobs }}</p></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="metric-card"><p class="metric-label">Printed Jobs</p><p class="metric-value">{{ printed_jobs }}</p></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="metric-card"><p class="metric-label">Revenue</p><p class="metric-value">Rs {{ "%.2f"|format(total_revenue) }}</p></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="metric-card"><p class="metric-label">Paper Left</p><p class="metric-value">{{ printer_status.paper_remaining }}</p></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="metric-card"><p class="metric-label">Ink Left</p><p class="metric-value">{{ "%.1f"|format(printer_status.ink_remaining_ratio * 100) }}%</p></div></div>
+    <div class="col-6 col-md-4 col-xl-2"><div class="metric-card"><p class="metric-label">Updated</p><p class="metric-value small">{{ printer_status.updated_at }}</p></div></div>
+</div>
+
+<div class="row g-3">
+    <div class="col-12">
+        <section class="glass-card p-4">
+            <h2 class="h5 mb-3">Active Queue</h2>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr><th>File</th><th>Status</th><th>ETA</th><th>Priority</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for job in queue_jobs %}
+                        <tr>
+                            <td>{{ job.filename }}</td>
+                            <td>{{ job.status }}</td>
+                            <td>{{ job.estimated_wait_minutes }} min</td>
+                            <td><span class="badge text-bg-secondary text-uppercase">{{ job.queue_priority }}</span></td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-secondary">No queued jobs.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <div class="col-12 col-lg-7">
+        <section class="glass-card p-4 h-100">
+            <h2 class="h5 mb-3">Revenue Log</h2>
+            <div class="table-responsive">
+                <table class="table table-striped align-middle mb-0">
+                    <thead>
+                        <tr><th>File</th><th>Amount</th><th>Payment ID</th><th>Time</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for item in recent_revenue %}
+                        <tr>
+                            <td>{{ item.filename }}</td>
+                            <td>Rs {{ "%.2f"|format(item.pricing.total_cost) }}</td>
+                            <td>{{ item.payment_id }}</td>
+                            <td>{{ item.updated_at }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-secondary">No revenue entries yet.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <div class="col-12 col-lg-5">
+        <section class="glass-card p-4 h-100">
+            <h2 class="h5 mb-3">Maintenance Alerts</h2>
+            {% if printer_status.alerts %}
+                {% for alert in printer_status.alerts %}
+                    <div class="alert alert-danger border-0 py-2" role="alert">{{ alert }}</div>
+                {% endfor %}
+            {% endif %}
+            <ul class="list-group list-group-flush">
+                {% for alert in open_alerts %}
+                <li class="list-group-item px-0">{{ alert.message }} <span class="text-secondary">({{ alert.created_at }})</span></li>
+                {% else %}
+                <li class="list-group-item px-0 text-secondary">No active alerts.</li>
+                {% endfor %}
+            </ul>
+        </section>
+    </div>
+</div>
+{% endblock %}

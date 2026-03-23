@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Payment | Smart IoT Printing{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-1">
+    <div class="col-12 col-lg-8 col-xl-7">
+        <section class="glass-card p-4 p-md-5">
+            <p class="eyebrow mb-2">Checkout</p>
+            <h1 class="h2 mb-1">Razorpay UPI Payment</h1>
+            <p class="text-secondary mb-4">Job: <span class="fw-semibold">{{ job.filename }}</span></p>
+
+            {% if payment_error %}
+                <div class="alert alert-danger border-0 shadow-sm" role="alert">{{ payment_error }}</div>
+                <p class="text-secondary">Razorpay keys are missing. Continue with demo mode (no live transaction).</p>
+                {% if allow_mock_payment %}
+                    <form action="{{ url_for('payment.mock_success') }}" method="post">
+                        <button type="submit" class="btn btn-brand btn-lg w-100">Simulate Payment Success</button>
+                    </form>
+                {% endif %}
+            {% else %}
+                <div class="breakdown mb-4">
+                    <p><strong>BW Cost:</strong> Rs {{ "%.2f"|format(pricing.bw_cost) }}</p>
+                    <p><strong>Color Cost:</strong> Rs {{ "%.2f"|format(pricing.color_cost) }}</p>
+                    <p class="total mb-0"><strong>Total:</strong> Rs {{ "%.2f"|format(pricing.total_cost) }}</p>
+                </div>
+
+                <button id="payNowButton" type="button" class="btn btn-brand btn-lg w-100">Pay with UPI (GPay / PhonePe)</button>
+                <div id="paymentLoading" class="loading hidden mt-3">
+                    <div class="spinner"></div>
+                    <span>Verifying payment and dispatching print job...</span>
+                </div>
+            {% endif %}
+
+            <div class="mt-4">
+                <a class="btn btn-outline-secondary" href="{{ url_for('main.options') }}">Back to Cost Page</a>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{% if not payment_error %}
+<script>
+    window.__PAYMENT__ = {
+        keyId: "{{ razorpay_key_id }}",
+        orderId: "{{ razorpay_order.id if razorpay_order else '' }}",
+        amount: {{ razorpay_order.amount if razorpay_order else 0 }},
+        currency: "{{ razorpay_order.currency if razorpay_order else 'INR' }}",
+        jobId: "{{ job._id }}",
+        customerName: "Print User"
+    };
+</script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+{% endif %}
+{% endblock %}

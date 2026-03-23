@@ -12,3 +12,4 @@ razorpay==1.4.2
 APScheduler==3.10.4
 gunicorn==23.0.0
 razorpay
+gunicorn

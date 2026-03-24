@@ -7,6 +7,8 @@ services:
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     autoDeploy: true
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
       - key: FLASK_SECRET_KEY
         sync: false
       - key: MONGO_URI

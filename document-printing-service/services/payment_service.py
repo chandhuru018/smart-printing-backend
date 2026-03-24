@@ -1,12 +1,16 @@
 import hashlib
 import hmac
+import logging
 import os
 from dataclasses import dataclass
 from typing import Dict
 
+logger = logging.getLogger(__name__)
+
 try:
     import razorpay
-except ImportError:
+except Exception as _razorpay_import_err:  # noqa: BLE001
+    logger.warning("razorpay package could not be imported: %s", _razorpay_import_err)
     razorpay = None
 
 
@@ -29,11 +33,23 @@ class PaymentService:
     def __init__(self):
         key_id = os.getenv("RAZORPAY_KEY_ID", "")
         key_secret = os.getenv("RAZORPAY_KEY_SECRET", "")
+        # RAZORPAY_WEBHOOK_SECRET is OPTIONAL — only needed to verify Razorpay webhook POSTs.
+        # Payment creation and client-side signature verification only need KEY_ID + KEY_SECRET.
         webhook_secret = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
 
         self.config = RazorpayConfig(key_id=key_id, key_secret=key_secret, webhook_secret=webhook_secret)
-        self.enabled = bool(key_id and key_secret and webhook_secret and razorpay is not None)
+        # Only KEY_ID and KEY_SECRET are required to enable live payments.
+        self.enabled = bool(key_id and key_secret and razorpay is not None)
         self.client = razorpay.Client(auth=(key_id, key_secret)) if self.enabled else None
+
+        logger.info(
+            "[PaymentService] enabled=%s key_id=%s key_secret=%s webhook_secret=%s razorpay_pkg=%s",
+            self.enabled,
+            "SET" if key_id else "MISSING",
+            "SET" if key_secret else "MISSING",
+            "SET" if webhook_secret else "MISSING",
+            "ok" if razorpay is not None else "import-failed",
+        )
 
     def assert_configured(self):
         if not self.enabled:

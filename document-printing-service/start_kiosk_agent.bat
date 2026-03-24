@@ -13,9 +13,10 @@ echo.
 :: Auto-open browser after 2 seconds
 start "" /b cmd /c "timeout /t 2 /nobreak >nul && start http://localhost:5001"
 
-:: Run the kiosk agent
-python kiosk_agent.py
+:: Run the kiosk agent silently in background so closing window doesn't kill it!
+start /B pythonw kiosk_agent.py
 
 echo.
-echo Kiosk Agent stopped. Press any key to close.
-pause >nul
+echo Kiosk Agent started successfully in background!
+echo You can safely close this black window.
+timeout /t 5 >nul

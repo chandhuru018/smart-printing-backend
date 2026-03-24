@@ -11,6 +11,7 @@ import certifi
 from routes.main import main_bp
 from routes.payment import payment_bp
 from routes.admin import admin_bp
+from routes.kiosk import kiosk_bp
 from services.maintenance_monitor import MaintenanceMonitor
 
 
@@ -91,6 +92,7 @@ def create_app() -> Flask:
     app.register_blueprint(main_bp)
     app.register_blueprint(payment_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(kiosk_bp)
 
     monitor = MaintenanceMonitor(db=db)
     monitor.start()

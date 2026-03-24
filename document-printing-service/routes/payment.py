@@ -1,4 +1,5 @@
 import os
+import random
 from datetime import datetime, timezone
 
 from bson import ObjectId
@@ -15,18 +16,22 @@ def _use_local_print_agent() -> bool:
     return os.getenv("PRINT_VIA_AGENT", "false").lower() == "true"
 
 
-def _enqueue_print_for_agent(db, job_id: ObjectId):
+def _enqueue_print_for_agent(db, job_id: ObjectId) -> str:
+    """Mark job as awaiting PIN release. Returns the generated 4-digit PIN."""
+    pin = f"{random.randint(1000, 9999)}"
     db.jobs.update_one(
         {"_id": job_id},
         {
             "$set": {
                 "status": "paid",
-                "print_status": "queued_for_agent",
+                "print_status": "awaiting_release",
+                "release_pin": pin,
                 "print_enqueued_at": datetime.now(timezone.utc),
                 "updated_at": datetime.now(timezone.utc),
             }
         },
     )
+    return pin
 
 
 def _trigger_print(job: dict, db, fs, payment_id: str):
@@ -159,7 +164,8 @@ def verify_payment():
     _mark_payment_success(db=db, job_id=job["_id"], payment_id=payment_id)
 
     if _use_local_print_agent():
-        _enqueue_print_for_agent(db=db, job_id=job["_id"])
+        pin = _enqueue_print_for_agent(db=db, job_id=job["_id"])
+        session["release_pin"] = pin
         return jsonify({"ok": True, "redirect_url": url_for("payment.success")})
 
     try:
@@ -237,7 +243,8 @@ def mock_success():
     payment_id = f"mockpay_{job_id}"
     _mark_payment_success(db=db, job_id=job["_id"], payment_id=payment_id)
     if _use_local_print_agent():
-        _enqueue_print_for_agent(db=db, job_id=job["_id"])
+        pin = _enqueue_print_for_agent(db=db, job_id=job["_id"])
+        session["release_pin"] = pin
         return redirect(url_for("payment.success"))
 
     db.jobs.update_one({"_id": job["_id"]}, {"$set": {"status": "printing", "print_status": "printing"}})
@@ -247,4 +254,5 @@ def mock_success():
 
 @payment_bp.route("/success")
 def success():
-    return render_template("success.html")
+    release_pin = session.pop("release_pin", None)
+    return render_template("success.html", release_pin=release_pin)

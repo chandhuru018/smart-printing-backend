@@ -31,8 +31,8 @@ def _claim_next_job(db):
     return db.jobs.find_one_and_update(
         {
             "payment_status": "paid",
-            "print_status": {"$in": ["queued_for_agent", "pending"]},
-            "status": {"$in": ["paid", "payment_pending"]},
+            "print_status": {"$in": ["pin_released", "queued_for_agent", "pending"]},
+            "status": {"$in": ["paid", "printing", "payment_pending"]},
         },
         {
             "$set": {
@@ -43,9 +43,10 @@ def _claim_next_job(db):
             },
             "$inc": {"print_attempts": 1},
         },
-        sort=[("paid_at", 1), ("updated_at", 1)],
+        sort=[("pin_released_at", 1), ("paid_at", 1), ("updated_at", 1)],
         return_document=ReturnDocument.AFTER,
     )
+
 
 
 def _complete_job(db, job_id, payment_id: str, print_result: dict, printed_pages: int):

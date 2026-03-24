@@ -33,6 +33,17 @@ def create_app() -> Flask:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+
+    # Startup diagnostics — confirm critical env vars are present (values masked).
+    _razorpay_key_id = os.getenv("RAZORPAY_KEY_ID", "")
+    _razorpay_key_secret = os.getenv("RAZORPAY_KEY_SECRET", "")
+    _razorpay_webhook = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+    logging.info(
+        "[STARTUP] Razorpay env check — KEY_ID=%s KEY_SECRET=%s WEBHOOK_SECRET=%s",
+        "SET" if _razorpay_key_id else "MISSING",
+        "SET" if _razorpay_key_secret else "MISSING",
+        "SET" if _razorpay_webhook else "MISSING",
+    )
     app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY", "change-me-in-production")
     app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_UPLOAD_MB", "20")) * 1024 * 1024
     app.config["ALLOWED_EXTENSIONS"] = {"pdf", "docx", "jpg", "jpeg", "png"}

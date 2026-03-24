@@ -338,6 +338,28 @@ class PrintService:
                 command.append(file_path)
                 return command
 
+            # ── Adobe Acrobat / Reader Fallback ──
+            if Path(file_path).suffix.lower() == ".pdf":
+                adobe_paths = [
+                    r"C:\Program Files (x86)\Adobe\Acrobat Reader DC\Reader\AcroRd32.exe",
+                    r"C:\Program Files\Adobe\Acrobat DC\Acrobat\Acrobat.exe",
+                    r"C:\Program Files (x86)\Adobe\Reader 11.0\Reader\AcroRd32.exe",
+                    r"C:\Program Files (x86)\Adobe\Reader 10.0\Reader\AcroRd32.exe",
+                ]
+                acrobat = None
+                for ap in adobe_paths:
+                    if Path(ap).exists():
+                        acrobat = ap
+                        break
+                
+                if acrobat:
+                    cmd = [acrobat, "/t", file_path]
+                    if target_printer:
+                        cmd.append(target_printer)
+                    # Adobe typically leaves the background window open but executes the print immediately.
+                    return cmd
+
+            # ── Generic Shell Fallback ──
             escaped_path = file_path.replace("'", "''")
             escaped_printer = (target_printer or "").replace("'", "''")
             return [

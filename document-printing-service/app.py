@@ -55,7 +55,7 @@ def create_app() -> Flask:
     except PyMongoError as exc:
         if not use_mock_on_failure:
             raise RuntimeError(
-                "Unable to connect to MongoDB. Verify MONGO_URI/MONGODB_URI, Atlas IP access list, and TLS certificates."
+                f"Unable to connect to MongoDB. Verify MONGO_URI/MONGODB_URI, Atlas IP access list, and TLS certificates. Details: {exc}"
             ) from exc
 
         try:

@@ -423,21 +423,69 @@ KIOSK_HTML = """<!DOCTYPE html>
   <!-- PIN Entry Panel -->
   <div id="pinPanel">
     <label for="pinBox">Release Code</label>
-    <input id="pinBox" cfunction submitPin() {
+    <input id="pinBox" class="pin-input" type="text" inputmode="numeric"
+           pattern="[0-9]{4}" maxlength="4" placeholder="••••" autocomplete="off">
+    <button class="btn" id="releaseBtn" onclick="submitPin()">Release Print Job</button>
+    <div id="pinMsg" class="msg" style="display:none"></div>
+  </div>
+
+  <!-- Confirmation Panel -->
+  <div id="confirmPanel" class="confirm">
+    <div class="big-icon">🎉</div>
+    <h2>Printing Now!</h2>
+    <p>Your document is being sent to the printer.</p>
+    <div class="job-info" id="jobInfo"></div>
+    <div id="printStatus" class="msg info">⏳ Waiting for printer confirmation…</div>
+    <button class="btn" onclick="resetForm()" style="margin-top:1rem; background: var(--surface); border: 1px solid var(--border); color: var(--text);">
+      ← New PIN Entry
+    </button>
+  </div>
+
+  <!-- Agent Status -->
+  <div style="text-align:center">
+    <div class="status-bar" id="agentStatus">
+      <div class="dot yellow" id="agentDot"></div>
+      <span id="agentText">Connecting…</span>
+    </div>
+  </div>
+
+  <!-- Queue -->
+  <div class="queue-section">
+    <h3>Print Queue</h3>
+    <div id="queueList"><div style="color:var(--muted);font-size:.82rem">Loading…</div></div>
+  </div>
+</div>
+
+<footer>College Kiosk CPU · Smart IoT Printing Project · <span id="clock"></span></footer>
+
+<script>
+const CLOUD = "{{ cloud_url }}";
+let currentJobId = null;
+let pollTimer = null;
+
+// ── Clock ──────────────────────────────────────────────────────────────────
+function tick() {
+  document.getElementById("clock").textContent =
+    new Date().toLocaleTimeString("en-IN", {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+}
+setInterval(tick, 1000); tick();
+
+// ── PIN Submission ──────────────────────────────────────────────────────────
+function submitPin() {
   const pin = document.getElementById("pinBox").value.trim();
-  if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+  if (pin.length !== 4 || !/^\\d{4}$/.test(pin)) {
     showMsg("pinMsg", "err", "Please enter exactly 4 digits.");
     return;
   }
   document.getElementById("releaseBtn").disabled = true;
-  showMsg("pinMsg", "info", "Validating PIN with server...");
+  showMsg("pinMsg", "info", "Validating PIN with cloud server…");
 
   fetch("/release-pin", {
     method: "POST",
     headers: {"Content-Type":"application/json"},
     body: JSON.stringify({pin})
   })
-  .then(r => r.json().catch(() => ({ok: false, error: `Invalid response format (Status ${r.status})`})))
+  .then(r => r.json().catch(() => ({ok: false, error: `Invalid JSON response (Status ${r.status})`})))
   .then(d => {
     if (d.ok) {
       currentJobId = d.job_id;
@@ -448,7 +496,7 @@ KIOSK_HTML = """<!DOCTYPE html>
     }
   })
   .catch((err) => {
-    showMsg("pinMsg", "err", "Network error: " + (err.message || "Cannot reach server."));
+    showMsg("pinMsg", "err", "Network Error: " + (err.message || "Cannot reach server."));
     document.getElementById("releaseBtn").disabled = false;
   });
 }
@@ -478,7 +526,7 @@ function pollPrintStatus() {
       const s = d.job.print_status;
       const el = document.getElementById("printStatus");
       if (s === "printing") {
-        el.className = "msg info"; el.textContent = "🖨  Printing in progress...";
+        el.className = "msg info"; el.textContent = "🖨  Printing in progress…";
         pollTimer = setTimeout(pollPrintStatus, 2000);
       } else if (s === "printed" || s === "simulated_print") {
         el.className = "msg ok";
@@ -543,61 +591,6 @@ function refreshQueue() {
 function badgeFor(status) {
   if (status === "awaiting_release") return '<span class="badge badge-wait">Awaiting PIN</span>';
   if (status === "pin_released")     return '<span class="badge badge-wait">PIN-Released</span>';
-  if (status === "printing")         return '<span class="badge badge-print">Printing...</span>';
-  if (status === "printed")          return '<span class="badge badge-done">Printed ✓</span>';
-  if (status === "simulated_print")  return '<span class="badge badge-sim">Simulated</span>';
-  return `<span class="badge badge-sim">${status}</span>`;
-}
-
-function showMsg(id, type, text) {
-  const el = document.getElementById(id);
-  el.className = "msg " + type;
-  el.textContent = text;
-  el.style.display = "block";
-}
-
-// Auto-submit on 4 digits
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("pinBox").addEventListener("input", e => {
-    if (e.target.value.length === 4) document.getElementById("releaseBtn").focus();
-  });
-  document.getElementById("pinBox").addEventListener("keydown", e => {
-    if (e.key === "Enter") submitPin();
-  });
-  refreshQueue();
-  setInterval(refreshQueue, 5000);
-});;
-      const txt = document.getElementById("agentText");
-      if (d.state === "ready") {
-        dot.className = "dot green"; txt.textContent = "Print Agent Ready";
-      } else if (d.state.startsWith("printing")) {
-        dot.className = "dot yellow"; txt.textContent = "🖨 " + d.state;
-      } else if (d.state === "disabled") {
-        dot.className = "dot red"; txt.textContent = "Agent Disabled";
-      } else {
-        dot.className = "dot yellow"; txt.textContent = d.state;
-      }
-    }).catch(() => {});
-
-  fetch(`${CLOUD}/api/kiosk/queue`)
-    .then(r => r.json())
-    .then(d => {
-      const list = document.getElementById("queueList");
-      if (!d.ok || !d.jobs.length) {
-        list.innerHTML = '<div style="color:var(--muted);font-size:.82rem;padding:.4rem 0">No jobs in queue</div>';
-        return;
-      }
-      list.innerHTML = d.jobs.map(j => {
-        const badge = badgeFor(j.print_status);
-        const name = j.filename.length > 28 ? j.filename.slice(0,26)+"…" : j.filename;
-        return `<div class="queue-row">${badge}<span>${name}</span></div>`;
-      }).join("");
-    }).catch(() => {});
-}
-
-function badgeFor(status) {
-  if (status === "awaiting_release") return '<span class="badge badge-wait">Awaiting PIN</span>';
-  if (status === "pin_released")     return '<span class="badge badge-wait">PIN-Released</span>';
   if (status === "printing")         return '<span class="badge badge-print">Printing…</span>';
   if (status === "printed")          return '<span class="badge badge-done">Printed ✓</span>';
   if (status === "simulated_print")  return '<span class="badge badge-sim">Simulated</span>';
@@ -626,6 +619,10 @@ document.addEventListener("DOMContentLoaded", () => {
 </body>
 </html>"""
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  FLASK ROUTES
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @app.route("/")
 def index():
@@ -668,20 +665,18 @@ def kiosk_release_pin():
         try:
             return jsonify(resp.json()), resp.status_code
         except Exception:
-            # Cloud returned non-JSON (HTML 500)
             log.error("Cloud PIN validation returned Non-JSON: %s", resp.text)
             return _release_via_mongo(pin)
-    except _requests.exceptions.RequestException as exc:
-        log.error("Cloud PIN network fail: %s", exc)
-        return _release_via_mongo(pin)
     except Exception as exc:
         log.error("Cloud PIN validation failed: %s", exc)
+        # Fallback: try direct MongoDB
         return _release_via_mongo(pin)
+
 
 def _release_via_mongo(pin: str):
     """Validate PIN directly in MongoDB (fallback if cloud unreachable)."""
     if not HAS_MONGO or not MONGO_URI:
-        return jsonify({"ok": False, "error": "Cloud unreachable and MongoDB disabled. Check internet."}), 503
+        return jsonify({"ok": False, "error": "Cannot reach cloud and MongoDB not configured"}), 503
     try:
         _, db, _ = _connect_db()
         job = db.jobs.find_one_and_update(
@@ -692,7 +687,7 @@ def _release_via_mongo(pin: str):
             return_document=ReturnDocument.AFTER,
         )
         if not job:
-            return jsonify({"ok": False, "error": "PIN not found or already used."}), 404
+            return jsonify({"ok": False, "error": "PIN not found or already used"}), 404
         return jsonify({
             "ok": True,
             "job_id": str(job["_id"]),
@@ -702,7 +697,7 @@ def _release_via_mongo(pin: str):
             "mode": job.get("mode", "bw"),
         })
     except Exception as exc:
-        return jsonify({"ok": False, "error": f"Cloud failed & DB Error: {str(exc)}"}), 500
+        return jsonify({"ok": False, "error": f"DB error: {exc}"}), 500
 
 
 @app.route("/agent-status")

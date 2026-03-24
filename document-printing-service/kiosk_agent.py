@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Smart IoT Printing — Local Kiosk Agent  (kiosk_agent.py)
+Smart IoT Printing - Local Kiosk Agent  (kiosk_agent.py)
 =========================================================
 Run this script on the college CPU that is PHYSICALLY connected to
 the EPSON L3110 (or any default Windows printer).
@@ -47,7 +47,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-# ── Load .env before anything else ──────────────────────────────────────────
+# -- Load .env before anything else ------------------------------------------
 _here = Path(__file__).resolve().parent
 try:
     from dotenv import load_dotenv
@@ -279,7 +279,7 @@ def _print_agent_loop():
 
                     fname = job.get("filename", "unknown")
                     _agent_status["state"] = f"printing: {fname}"
-                    log.info("▶  Printing: %s  (%s)", fname, job["_id"])
+                    log.info("-> Printing: %s  (%s)", fname, job["_id"])
 
                     file_bytes = fs.get(job["file_id"]).read()
                     result     = _do_print(job, file_bytes)
@@ -294,7 +294,7 @@ def _print_agent_loop():
                         "status": result.get("status", "queued"),
                         "at": datetime.now(timezone.utc).isoformat(),
                     }
-                    log.info("✔  Done: %s", fname)
+                    log.info("[OK] Done: %s", fname)
 
                 except Exception as err:
                     if "job" in dir() and job:
@@ -690,11 +690,11 @@ def agent_status():
 
 def _banner():
     print("\n" + "=" * 66)
-    print("  Smart IoT Printing — Local Kiosk Agent")
+    print("  Smart IoT Printing - Local Kiosk Agent")
     print("=" * 66)
     print(f"  Kiosk UI  : http://localhost:{KIOSK_PORT}")
     print(f"  Cloud     : {CLOUD_BASE_URL}")
-    print(f"  MongoDB   : {'CONFIGURED ✓' if MONGO_URI else 'MISSING ✗  (edit .env)'}")
+    print(f"  MongoDB   : {'CONFIGURED [OK]' if MONGO_URI else 'MISSING [X]  (edit .env)'}")
     print(f"  Simulate  : {SIMULATE_PRINT}")
     print(f"  Printer   : {os.getenv('PRINTER_NAME','(Windows Default)')}")
     print("=" * 66)

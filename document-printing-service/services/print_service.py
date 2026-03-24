@@ -89,6 +89,7 @@ class PrintService:
         common_paths = [
             r"C:\Program Files\SumatraPDF\SumatraPDF.exe",
             r"C:\Program Files (x86)\SumatraPDF\SumatraPDF.exe",
+            os.path.expandvars(r"%LOCALAPPDATA%\SumatraPDF\SumatraPDF.exe"),
         ]
         for path in common_paths:
             if Path(path).exists():
@@ -353,11 +354,31 @@ class PrintService:
                         break
                 
                 if acrobat:
-                    cmd = [acrobat, "/t", file_path]
+                    # Adobe typically ignores organic exit commands after printing
                     if target_printer:
-                        cmd.append(target_printer)
-                    # Adobe typically leaves the background window open but executes the print immediately.
-                    return cmd
+                        cmd = [acrobat, "/t", file_path, target_printer, target_printer, target_printer]
+                    else:
+                        cmd = [acrobat, "/p", "/h", file_path]
+                    
+                    try:
+                        import subprocess
+                        # Run detached so Python doesn't hang forever waiting for Adobe UI
+                        proc = subprocess.Popen(cmd)
+                        time.sleep(15) 
+                        try:
+                            proc.terminate()
+                            # Extra hammer for old acrobats
+                            subprocess.run(["taskkill", "/F", "/IM", Path(acrobat).name], capture_output=True)
+                        except Exception:
+                            pass
+                        
+                        return {
+                            "command": " ".join(cmd),
+                            "stdout": "Sent to Adobe Reader for background printing",
+                            "status": "queued",
+                        }
+                    except Exception as e:
+                        raise PrintExecutionError(f"Adobe spool fail: {e}")
 
             # ── Generic Shell Fallback ──
             escaped_path = file_path.replace("'", "''")
@@ -401,6 +422,10 @@ class PrintService:
                     "stdout": "Print simulated without hardware",
                     "status": "simulated",
                 }
+            
+            # If the resolver already handled execution (like our Adobe detached hack), return its result
+            if isinstance(command, dict):
+                return command
 
             stdout_chunks = []
             for _ in range(copies):
@@ -417,8 +442,6 @@ class PrintService:
         except subprocess.TimeoutExpired as exc:
             raise PrintExecutionError("Print command timeout") from exc
         finally:
-            # Windows Print/PrintTo fallback may launch Acrobat asynchronously.
-            # Keep temp file briefly so the spawned process can still open it.
             if (
                 os.name == "nt"
                 and command

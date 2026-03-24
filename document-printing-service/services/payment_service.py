@@ -2,16 +2,45 @@ import hashlib
 import hmac
 import logging
 import os
+import sys
+import types
 from dataclasses import dataclass
 from typing import Dict
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# pkg_resources compatibility shim for Python 3.12+ / Render Python 3.14
+# razorpay uses pkg_resources.get_distribution() to read its own version.
+# On modern Python + Render, setuptools may not expose pkg_resources as a
+# top-level import. Inject a minimal shim via importlib.metadata so razorpay
+# imports cleanly without depending on the environment having setuptools set up.
+# ---------------------------------------------------------------------------
+if "pkg_resources" not in sys.modules:
+    try:
+        import pkg_resources  # noqa: F401 (already importable — nothing to do)
+    except ImportError:
+        import importlib.metadata as _ilm  # noqa: F401
+
+        def _get_dist(name: str):
+            try:
+                return types.SimpleNamespace(version=_ilm.version(name))
+            except Exception:  # noqa: BLE001
+                return types.SimpleNamespace(version="unknown")
+
+        _shim = types.ModuleType("pkg_resources")
+        _shim.get_distribution = _get_dist
+        _shim.DistributionNotFound = Exception
+        _shim.require = lambda *a, **kw: None
+        sys.modules["pkg_resources"] = _shim
+        logger.info("[PaymentService] injected pkg_resources shim (importlib.metadata)")
 
 try:
     import razorpay
 except Exception as _razorpay_import_err:  # noqa: BLE001
     logger.warning("razorpay package could not be imported: %s", _razorpay_import_err)
     razorpay = None
+
 
 
 class PaymentConfigurationError(Exception):

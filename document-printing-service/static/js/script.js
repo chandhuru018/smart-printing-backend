@@ -218,6 +218,51 @@ document.addEventListener("DOMContentLoaded", () => {
     const payBtn = document.getElementById("payNowButton");
     const paymentLoading = document.getElementById("paymentLoading");
 
+    // Retry fetch with timeout — handles Render free-tier cold-start delays
+    async function verifyWithRetry(body, maxRetries = 3, timeoutMs = 35000) {
+        let lastErr;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const res = await fetch("/payment/verify", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                    signal: controller.signal,
+                });
+                clearTimeout(timer);
+                return res;
+            } catch (err) {
+                clearTimeout(timer);
+                lastErr = err;
+                const isTimeout = err.name === "AbortError";
+                const isNetErr = err.name === "TypeError";
+                if (attempt < maxRetries && (isTimeout || isNetErr)) {
+                    // Show retry progress in loading text
+                    const loadingSpan = paymentLoading?.querySelector("span");
+                    if (loadingSpan) {
+                        loadingSpan.textContent = `Server is starting up... retrying (${attempt}/${maxRetries})`;
+                    }
+                    // Wait 3s between retries
+                    await new Promise(r => setTimeout(r, 3000));
+                    continue;
+                }
+                throw err;
+            }
+        }
+        throw lastErr;
+    }
+
+    // Simulate a successful payment (used in test mode when UPI fails)
+    function simulatePayment() {
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = "/payment/mock-success";
+        document.body.appendChild(form);
+        form.submit();
+    }
+
     if (payBtn && window.__PAYMENT__) {
         payBtn.addEventListener("click", () => {
             payBtn.disabled = true;
@@ -230,41 +275,52 @@ document.addEventListener("DOMContentLoaded", () => {
                 name: "Smart IoT Printing",
                 description: "Document print payment",
                 order_id: p.orderId,
+                // All methods enabled — test mode cards/netbanking work; UPI needs real account
                 method: {
                     upi: true,
-                    card: false,
-                    netbanking: false,
-                    wallet: false,
+                    card: true,
+                    netbanking: true,
+                    wallet: true,
                 },
                 prefill: {
                     name: p.customerName,
                 },
                 handler: async function (response) {
                     paymentLoading?.classList.remove("hidden");
+                    const loadingSpan = paymentLoading?.querySelector("span");
+                    if (loadingSpan) {
+                        loadingSpan.textContent = "Verifying payment, please wait...";
+                    }
                     try {
-                        const verifyRes = await fetch("/payment/verify", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                job_id: p.jobId,
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_signature: response.razorpay_signature,
-                            }),
+                        const verifyRes = await verifyWithRetry({
+                            job_id: p.jobId,
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature,
                         });
                         const verifyData = await verifyRes.json();
                         if (!verifyRes.ok || !verifyData.ok) {
-                            throw new Error(verifyData.error || "Payment verification failed");
+                            throw new Error(verifyData.error || "Payment verification failed. Please contact support.");
                         }
                         window.location.href = verifyData.redirect_url || "/success";
                     } catch (err) {
                         paymentLoading?.classList.add("hidden");
                         payBtn.disabled = false;
-                        alert(err.message || "Payment failed");
+                        const msg = err.name === "AbortError"
+                            ? "Server is taking too long to respond. Your payment may still be captured — please wait 1 minute and reload the page or contact support."
+                            : (err.message || "Payment verification failed. Please contact support.");
+                        alert(msg);
                     }
                 },
                 modal: {
                     ondismiss: function () {
+                        // If test mode key, auto-simulate success on dismiss
+                        if (p.keyId && p.keyId.startsWith('rzp_test_')) {
+                            if (confirm('UPI failed in test mode. Click OK to simulate a successful payment and continue with your print job.')) {
+                                simulatePayment();
+                                return;
+                            }
+                        }
                         payBtn.disabled = false;
                     },
                 },

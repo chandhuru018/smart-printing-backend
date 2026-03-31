@@ -30,6 +30,18 @@
                     <div class="spinner"></div>
                     <span>Verifying payment and dispatching print job...</span>
                 </div>
+
+                {% if razorpay_key_id and razorpay_key_id.startswith('rzp_test_') %}
+                <div class="mt-4 p-3 rounded" style="background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.3);">
+                    <p class="mb-2" style="font-size:0.85rem;color:#fbbf24;font-weight:600;">⚠️ Test Mode Active — UPI will not work</p>
+                    <p class="mb-3" style="font-size:0.8rem;color:#94a3b8;">Real UPI apps are blocked in Razorpay test mode. Use the button below to simulate a successful payment.</p>
+                    <form action="{{ url_for('payment.mock_success') }}" method="post">
+                        <button type="submit" class="btn btn-lg w-100" style="background:rgba(234,179,8,0.15);border:1px solid rgba(234,179,8,0.5);color:#fbbf24;font-weight:700;">
+                            ✅ Simulate Successful Payment (Test Mode)
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
             {% endif %}
 
             <div class="mt-4">

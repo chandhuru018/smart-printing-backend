@@ -10,7 +10,7 @@ echo Starting Flask server...
 echo Keep this window open to see upload, payment and print progress.
 echo ================================================================
 
-python app.py
+"%~dp0venv\Scripts\python.exe" app.py
 
 echo.
 echo Server stopped. Press any key to close this window.

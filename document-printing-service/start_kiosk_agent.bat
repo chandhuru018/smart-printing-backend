@@ -18,7 +18,7 @@ echo If you close this window, the Kiosk Server will instantly disconnect!
 echo.
 
 set PYTHONIOENCODING=utf-8
-python kiosk_agent.py
+"%~dp0venv\Scripts\python.exe" kiosk_agent.py
 
 echo.
 echo Server Stopped! Press any key to exit.
